@@ -155,8 +155,10 @@ function convertDateFields(obj) {
     return toBeijingTime(obj);
   }
 
-  // 如果是 Mongoose 文档，转换为普通对象
-  if (obj.toObject && typeof obj.toObject === 'function') {
+  // 如果是 Mongoose 文档，转换为 JSON 对象（自动处理 ObjectId）
+  if (obj.toJSON && typeof obj.toJSON === 'function') {
+    obj = obj.toJSON();
+  } else if (obj.toObject && typeof obj.toObject === 'function') {
     obj = obj.toObject();
   }
 
@@ -165,13 +167,23 @@ function convertDateFields(obj) {
     const converted = {};
     for (const key in obj) {
       if (obj.hasOwnProperty(key)) {
+        const value = obj[key];
+
         // 特殊处理日期字段
-        if (obj[key] instanceof Date) {
-          converted[key] = toBeijingTime(obj[key]);
-        } else if (typeof obj[key] === 'object') {
-          converted[key] = convertDateFields(obj[key]);
-        } else {
-          converted[key] = obj[key];
+        if (value instanceof Date) {
+          converted[key] = toBeijingTime(value);
+        }
+        // 处理 ObjectId（转换为字符串）
+        else if (value && value.constructor && value.constructor.name === 'ObjectId') {
+          converted[key] = value.toString();
+        }
+        // 递归处理对象和数组
+        else if (value && typeof value === 'object') {
+          converted[key] = convertDateFields(value);
+        }
+        // 其他类型直接赋值
+        else {
+          converted[key] = value;
         }
       }
     }
