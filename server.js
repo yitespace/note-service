@@ -50,7 +50,9 @@ const HabitSchema = new mongoose.Schema({
     target: { type: String, default: '每日' }, // 目标描述
     currentStreak: { type: Number, default: 0 }, // 当前连击天数
     maxStreak: { type: Number, default: 0 }, // 历史最大连击
-    checkIns: [{ type: Date }] // 打卡日期列表
+    checkIns: [{ type: Date }], // 打卡日期列表
+    reminderTime: { type: String, default: '' }, // 提醒时间，如 "09:00"
+    syncSystemAlarm: { type: Boolean, default: false } // 是否同步系统闹钟
 }, {
     timestamps: true // 自动管理 createdAt 和 updatedAt
 });
@@ -494,14 +496,16 @@ app.get('/api/habits', async (req, res) => {
  */
 app.post('/api/habits', async (req, res) => {
     try {
-        const { name, frequency, target } = req.body;
+        const { name, frequency, target, reminderTime, syncSystemAlarm } = req.body;
         if (!name) return res.status(400).json({ code: 400, error: '习惯名称不能为空' });
 
         const habit = new Habit({
             userId: req.userId,
             name,
             frequency: frequency || 'daily',
-            target: target || '每日'
+            target: target || '每日',
+            reminderTime: reminderTime || '',
+            syncSystemAlarm: syncSystemAlarm || false
         });
         await habit.save();
         res.status(201).json({ code: 200, message: '习惯创建成功', data: convertDateFields(habit) });
@@ -545,6 +549,66 @@ app.post('/api/habits/:id/checkin', async (req, res) => {
         res.json({ code: 200, message: '打卡成功', data: convertDateFields(habit) });
 
     } catch (error) {
+        res.status(500).json({ code: 500, error: error.message });
+    }
+});
+
+/**
+ * 更新习惯
+ * PUT /api/habits/:id
+ */
+app.put('/api/habits/:id', async (req, res) => {
+    try {
+        const { name, frequency, target, reminderTime, syncSystemAlarm } = req.body;
+
+        if (!name || name.trim() === '') {
+            return res.status(400).json({ code: 400, error: '习惯名称不能为空' });
+        }
+
+        // 必须同时匹配 ID 和用户 ID，确保用户只能修改自己的习惯
+        const habit = await Habit.findOneAndUpdate(
+            { _id: req.params.id, userId: req.userId },
+            {
+                name: name.trim(),
+                frequency: frequency || 'daily',
+                target: target || '每日',
+                reminderTime: reminderTime || '',
+                syncSystemAlarm: syncSystemAlarm || false
+            },
+            { new: true, runValidators: true } // new: true 返回更新后的文档
+        );
+
+        if (!habit) {
+            return res.status(404).json({ code: 404, error: '习惯未找到或无权访问' });
+        }
+
+        res.json({ code: 200, message: '习惯更新成功', data: convertDateFields(habit) });
+    } catch (error) {
+        if (error.name === 'CastError') {
+            return res.status(400).json({ code: 400, error: '无效的习惯 ID' });
+        }
+        res.status(400).json({ code: 400, error: error.message });
+    }
+});
+
+/**
+ * 删除习惯
+ * DELETE /api/habits/:id
+ */
+app.delete('/api/habits/:id', async (req, res) => {
+    try {
+        // 必须同时匹配 ID 和用户 ID，防止非法删除
+        const habit = await Habit.findOneAndDelete({ _id: req.params.id, userId: req.userId });
+
+        if (!habit) {
+            return res.status(404).json({ code: 404, error: '习惯未找到或无权访问' });
+        }
+
+        res.json({ code: 200, message: '习惯删除成功', data: convertDateFields(habit) });
+    } catch (error) {
+        if (error.name === 'CastError') {
+            return res.status(400).json({ code: 400, error: '无效的习惯 ID' });
+        }
         res.status(500).json({ code: 500, error: error.message });
     }
 });
