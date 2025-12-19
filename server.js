@@ -46,11 +46,13 @@ const Note = mongoose.model('Note', NoteSchema);
 const HabitSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     name: { type: String, required: true },
+    description: { type: String, default: '' }, // 习惯描述
     frequency: { type: String, default: 'daily' }, // daily, weekly_3, custom
     target: { type: String, default: '每日' }, // 目标描述
     currentStreak: { type: Number, default: 0 }, // 当前连击天数
     maxStreak: { type: Number, default: 0 }, // 历史最大连击
     checkIns: [{ type: Date }], // 打卡日期列表
+    reminderEnabled: { type: Boolean, default: false }, // 是否启用闹钟提醒
     reminderTime: { type: String, default: '' }, // 提醒时间，如 "09:00"
     syncSystemAlarm: { type: Boolean, default: false } // 是否同步系统闹钟
 }, {
@@ -496,14 +498,16 @@ app.get('/api/habits', async (req, res) => {
  */
 app.post('/api/habits', async (req, res) => {
     try {
-        const { name, frequency, target, reminderTime, syncSystemAlarm } = req.body;
+        const { name, description, frequency, target, reminderEnabled, reminderTime, syncSystemAlarm } = req.body;
         if (!name) return res.status(400).json({ code: 400, error: '习惯名称不能为空' });
 
         const habit = new Habit({
             userId: req.userId,
             name,
+            description: description || '',
             frequency: frequency || 'daily',
             target: target || '每日',
+            reminderEnabled: reminderEnabled || false,
             reminderTime: reminderTime || '',
             syncSystemAlarm: syncSystemAlarm || false
         });
@@ -559,7 +563,7 @@ app.post('/api/habits/:id/checkin', async (req, res) => {
  */
 app.put('/api/habits/:id', async (req, res) => {
     try {
-        const { name, frequency, target, reminderTime, syncSystemAlarm } = req.body;
+        const { name, description, frequency, target, reminderEnabled, reminderTime, syncSystemAlarm } = req.body;
 
         if (!name || name.trim() === '') {
             return res.status(400).json({ code: 400, error: '习惯名称不能为空' });
@@ -570,8 +574,10 @@ app.put('/api/habits/:id', async (req, res) => {
             { _id: req.params.id, userId: req.userId },
             {
                 name: name.trim(),
+                description: description || '',
                 frequency: frequency || 'daily',
                 target: target || '每日',
+                reminderEnabled: reminderEnabled || false,
                 reminderTime: reminderTime || '',
                 syncSystemAlarm: syncSystemAlarm || false
             },
