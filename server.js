@@ -36,7 +36,10 @@ const NoteSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // 新增用户ID关联
     title: { type: String, required: true },
     content: { type: String, default: '' },
-    images: [{ type: String }]
+    images: [{ type: String }],
+    reminderEnabled: { type: Boolean, default: false }, // 是否启用闹钟提醒
+    reminderDate: { type: String, default: '' }, // 提醒日期，如 "2025-12-20"
+    reminderTime: { type: String, default: '' } // 提醒时间，如 "18:15"
 }, {
     timestamps: true // 自动管理 createdAt 和 updatedAt
 });
@@ -338,7 +341,7 @@ app.get('/api/notes/:id', async (req, res) => {
  */
 app.post('/api/notes', async (req, res) => {
   try {
-    const { title, content, images } = req.body;
+    const { title, content, images, reminderEnabled, reminderDate, reminderTime } = req.body;
     if (!title || title.trim() === '') {
       return res.status(400).json({ code: 400, error: '标题不能为空' });
     }
@@ -347,7 +350,10 @@ app.post('/api/notes', async (req, res) => {
       userId: req.userId, // 写入用户ID
       title: title.trim(),
       content: content || '',
-      images: images || []
+      images: images || [],
+      reminderEnabled: reminderEnabled || false,
+      reminderDate: reminderDate || '',
+      reminderTime: reminderTime || ''
     });
     await note.save();
 
@@ -363,7 +369,7 @@ app.post('/api/notes', async (req, res) => {
  */
 app.put('/api/notes/:id', async (req, res) => {
   try {
-    const { title, content, images } = req.body;
+    const { title, content, images, reminderEnabled, reminderDate, reminderTime } = req.body;
 
     if (!title || title.trim() === '') {
       return res.status(400).json({ code: 400, error: '标题不能为空' });
@@ -375,7 +381,10 @@ app.put('/api/notes/:id', async (req, res) => {
       {
         title: title.trim(),
         content: content || '',
-        images: images || []
+        images: images || [],
+        reminderEnabled: reminderEnabled || false,
+        reminderDate: reminderDate || '',
+        reminderTime: reminderTime || ''
       },
       { new: true, runValidators: true } // new: true 返回更新后的文档
     );
@@ -399,7 +408,7 @@ app.put('/api/notes/:id', async (req, res) => {
  */
 app.patch('/api/notes/:id', async (req, res) => {
   try {
-    const { title, content, images } = req.body;
+    const { title, content, images, reminderEnabled, reminderDate, reminderTime } = req.body;
     const updateData = {};
 
     // 只更新提供的字段
@@ -411,6 +420,9 @@ app.patch('/api/notes/:id', async (req, res) => {
     }
     if (content !== undefined) updateData.content = content;
     if (images !== undefined) updateData.images = images;
+    if (reminderEnabled !== undefined) updateData.reminderEnabled = reminderEnabled;
+    if (reminderDate !== undefined) updateData.reminderDate = reminderDate;
+    if (reminderTime !== undefined) updateData.reminderTime = reminderTime;
 
     // 必须同时匹配 ID 和用户 ID，updatedAt 会自动更新
     const note = await Note.findOneAndUpdate(
